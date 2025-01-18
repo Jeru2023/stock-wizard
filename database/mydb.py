@@ -2,6 +2,8 @@ import pandas as pd
 from sqlalchemy import create_engine
 import configparser as cp
 import logging
+import os
+from tools import utils
 
 #####################################
 # Database access module for stock code table and stock daily K line table
@@ -22,7 +24,8 @@ class Database:
     @staticmethod
     def _create_engine():
         config = cp.ConfigParser()
-        config.read('stock.config', encoding='utf-8-sig')
+        config_path = os.path.join(utils.get_root_path(), 'config', 'stock.config')
+        config.read(config_path, encoding='utf-8-sig')
 
         user = config.get('DB', 'user')
         password = config.get('DB', 'password')

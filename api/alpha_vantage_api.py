@@ -9,11 +9,11 @@ import os
 
 class AlphaVantageAPI:
     def __init__(self):
-        self.config = cp.ConfigParser()
+        config = cp.ConfigParser()
         config_path = os.path.join(utils.get_root_path(), 'config','stock.config')
-        self.config.read(config_path, encoding='utf-8-sig')
-        self.base_url = self.config.get('AlphaVantage', 'base_url')
-        self.api_key = self.config.get('AlphaVantage', 'api_key')
+        config.read(config_path, encoding='utf-8-sig')
+        self.base_url = config.get('AlphaVantage', 'base_url')
+        self.api_key = config.get('AlphaVantage', 'api_key')
 
     @staticmethod
     def request_data(url):
