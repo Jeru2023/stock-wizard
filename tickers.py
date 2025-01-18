@@ -68,4 +68,4 @@ class Ticker:
 if __name__ == '__main__':
     ticker = Ticker()
     # ticker.update_tickers(['cn', 'hk', 'us'])
-    ticker.update_tickers(['cn'])
+    ticker.update_tickers(['hk'])

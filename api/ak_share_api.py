@@ -15,7 +15,8 @@ class AKShareAPI:
 
     @staticmethod
     def get_hk_tickers():
-        df = ak.stock_hk_spot()
+        df = ak.stock_hk_main_board_spot_em()
+        df.rename(columns={"代码": "symbol", "名称": "name"}, inplace=True)
         df_selected = df[['symbol', 'name']]
         df_selected["exchange"] = "HKEX"  # 增加 exchange 字段
         df_selected["ipo_date"] = ""  # 增加 ipo_date 字段
