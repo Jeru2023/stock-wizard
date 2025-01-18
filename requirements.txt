@@ -1,3 +1,5 @@
 akshare
 sqlalchemy
 loguru
+pandas
+numpy
