@@ -1,5 +1,4 @@
 import akshare as ak
-import pandas as pd
 
 
 class AKShareAPI:
@@ -10,12 +9,16 @@ class AKShareAPI:
     def get_cn_tickers():
         df = ak.stock_info_a_code_name()
         df.rename(columns={"code": "symbol"}, inplace=True)
+        df["exchange"] = ""  # 增加 exchange 字段
+        df["ipo_date"] = ""  # 增加 ipo_date 字段
         return df
 
     @staticmethod
     def get_hk_tickers():
         df = ak.stock_hk_spot()
         df_selected = df[['symbol', 'name']]
+        df_selected["exchange"] = "HKEX"  # 增加 exchange 字段
+        df_selected["ipo_date"] = ""  # 增加 ipo_date 字段
         return df_selected
 
     def get_tickers(self, region):

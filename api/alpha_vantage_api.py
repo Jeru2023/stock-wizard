@@ -120,12 +120,20 @@ class AlphaVantageAPI:
             download = s.get(url)
             decoded_content = download.content.decode('utf-8')
             cr = csv.reader(decoded_content.splitlines(), delimiter=',')
-            return list(cr)
+            data = list(cr)
+        # 将 CSV 数据转换为 DataFrame
+        df = pd.DataFrame(data[1:], columns=data[0])  # 第一行为列名
+
+        # 只保留 symbol, name, exchange 三个字段
+        df = df[['symbol', 'name', 'exchange', 'ipoDate']]
+        df.rename(columns={"ipoDate": "ipo_date"}, inplace=True)
+
+        return df
 
 
 if __name__ == '__main__':
     av_api = AlphaVantageAPI()
-    print(len(av_api.get_tickers()))
+    print(av_api.get_tickers().head())
 
     # EARNINGS, INCOME_STATEMENT
     # annual_earnings, quarterly_earnings = av_api.get_earnings('MCD')

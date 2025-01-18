@@ -53,6 +53,13 @@ def query_all_tickers():
     return df
 
 
+def query_tickers_by_region(region):
+    engine = db.get_connection()
+    sql = "select * from tickers where region = '{}';".format(region)
+    df = pd.read_sql_query(sql, engine)
+    return df
+
+
 def write_df_to_table(df, table_name):
     engine = db.get_connection()
     try:
