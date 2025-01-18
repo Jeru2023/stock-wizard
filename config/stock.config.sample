@@ -1,0 +1,10 @@
+[DB]
+user=stock
+password=YOUR_PASSWORD
+host=127.0.0.1
+port=3306
+database=stock-wizard
+
+[AlphaVantage]
+base_url=https://www.alphavantage.co/query
+api_key=YOUR_KEY
