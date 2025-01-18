@@ -45,6 +45,8 @@ class Ticker:
 
             # 只保留需要的字段：symbol, name, region, exchange, ipo_date
             new_tickers_filtered = new_tickers_filtered[["symbol", "name", "region", "exchange", "ipo_date"]]
+            # 将 ipo_date 字段的空字符串替换为 NULL
+            new_tickers_filtered["ipo_date"] = new_tickers_filtered["ipo_date"].replace('', None)
 
             # 将增量数据插入数据库
             mydb.write_df_to_table(new_tickers_filtered, "tickers")
@@ -66,4 +68,4 @@ class Ticker:
 if __name__ == '__main__':
     ticker = Ticker()
     # ticker.update_tickers(['cn', 'hk', 'us'])
-    ticker.update_tickers(['us'])
+    ticker.update_tickers(['cn'])
