@@ -63,6 +63,22 @@ def query_tickers_by_region(region):
     return df
 
 
+def query_daily_stock_prices(symbol, start_date, end_date):
+    if start_date is None:
+        start_date = '2000-01-01'  # 默认从 2000-01-01 开始获取数据
+    engine = db.get_connection()
+    sql = "select * from daily_stock_prices where symbol='{}' and date between '{}' and '{}';".format(symbol, start_date, end_date)
+    df = pd.read_sql_query(sql, engine)
+    return df
+
+
+def query_latest_daily_stock_prices(symbol):
+    engine = db.get_connection()
+    sql = "select date from daily_stock_prices where symbol='{}' order by date desc limit 1;".format(symbol)
+    df = pd.read_sql_query(sql, engine)
+    return df['date'][0]
+
+
 def write_df_to_table(df, table_name):
     engine = db.get_connection()
     try:

@@ -5,7 +5,7 @@ import pandas as pd
 class YahooAPI:
 
     @staticmethod
-    def get_daily_by_symbol(symbol, start_date, end_date):
+    def get_daily_prices_by_symbol(symbol, start_date, end_date):
         df = yf.download(symbol, start_date, end_date)
         df.columns = df.columns.droplevel('Ticker')
 
@@ -23,6 +23,6 @@ class YahooAPI:
 
 
 if __name__ == '__main__':
-    _df = YahooAPI.get_daily_by_symbol('AAPL', '2024-10-20', '2024-10-24')
+    _df = YahooAPI.get_daily_prices_by_symbol('AAPL', '2024-10-20', '2024-10-24')
     print(_df.head())
 

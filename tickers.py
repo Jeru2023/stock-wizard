@@ -4,7 +4,7 @@ from api.ak_share_api import AKShareAPI
 from database import mydb
 
 
-class Ticker:
+class Tickers:
     def __init__(self):
         self.av_api = AlphaVantageAPI()
         self.ak_api = AKShareAPI()
@@ -66,6 +66,6 @@ class Ticker:
 
 
 if __name__ == '__main__':
-    ticker = Ticker()
+    ticker = Tickers()
     # ticker.update_tickers(['cn', 'hk', 'us'])
     ticker.update_tickers(['hk'])
