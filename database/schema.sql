@@ -13,11 +13,11 @@ CREATE TABLE daily_stock_prices
 (
     date      date           not null,
     symbol    varchar(10)    not null,
-    adj_close decimal(10, 4) null,
-    close     decimal(10, 4) null,
-    high      decimal(10, 4) null,
-    low       decimal(10, 4) null,
-    open      decimal(10, 4) null,
+    adj_close decimal(15, 4) null,
+    close     decimal(15, 4) null,
+    high      decimal(15, 4) null,
+    low       decimal(15, 4) null,
+    open      decimal(15, 4) null,
     volume    bigint         null,
     primary key (date, symbol)
 );
