@@ -44,7 +44,7 @@ class Tickers:
             new_tickers_filtered["region"] = region
 
             # 只保留需要的字段：symbol, name, region, exchange, ipo_date
-            new_tickers_filtered = new_tickers_filtered[["symbol", "name", "region", "exchange", "ipo_date"]]
+            new_tickers_filtered = new_tickers_filtered[["symbol", "name", "region", "exchange", "ipo_date", "status"]]
             # 将 ipo_date 字段的空字符串替换为 NULL
             new_tickers_filtered["ipo_date"] = new_tickers_filtered["ipo_date"].replace('', None)
 
@@ -68,4 +68,4 @@ class Tickers:
 if __name__ == '__main__':
     ticker = Tickers()
     # ticker.update_tickers(['cn', 'hk', 'us'])
-    ticker.update_tickers(['hk'])
+    ticker.update_tickers(['us'])

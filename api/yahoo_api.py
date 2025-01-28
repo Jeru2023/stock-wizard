@@ -13,7 +13,7 @@ class YahooAPI:
         df.reset_index(inplace=True)  # 重置索引以保留日期
         df.rename(columns={
             'Price Date': 'Date',
-            'Adj Close': 'Adj_Close',
+            #'Adj Close': 'Adj_Close',
         }, inplace=True)
 
         # 添加 symbol 列

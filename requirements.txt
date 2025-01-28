@@ -1,5 +1,6 @@
 akshare
 sqlalchemy
+pymysql
 loguru
 pandas
 numpy

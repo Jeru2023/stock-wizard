@@ -11,6 +11,7 @@ class AKShareAPI:
         df.rename(columns={"code": "symbol"}, inplace=True)
         df["exchange"] = ""  # 增加 exchange 字段
         df["ipo_date"] = ""  # 增加 ipo_date 字段
+        df["status"] = "Active"
         return df
 
     @staticmethod
@@ -20,6 +21,7 @@ class AKShareAPI:
         df_selected = df[['symbol', 'name']]
         df_selected["exchange"] = "HKEX"  # 增加 exchange 字段
         df_selected["ipo_date"] = ""  # 增加 ipo_date 字段
+        df_selected["status"] = "Active"  # 增加 ipo_date 字段
         return df_selected
 
     def get_tickers(self, region):

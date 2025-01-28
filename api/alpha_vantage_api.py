@@ -115,7 +115,7 @@ class AlphaVantageAPI:
         return df
 
     def get_tickers(self):
-        url = '{}?function={}&apikey={}'.format(self.base_url, 'LISTING_STATUS', self.api_key)
+        url = '{}?function={}&apikey={}&state={}'.format(self.base_url, 'LISTING_STATUS', self.api_key, 'active')
         with requests.Session() as s:
             download = s.get(url)
             decoded_content = download.content.decode('utf-8')
@@ -125,7 +125,7 @@ class AlphaVantageAPI:
         df = pd.DataFrame(data[1:], columns=data[0])  # 第一行为列名
 
         # 只保留 symbol, name, exchange 三个字段
-        df = df[['symbol', 'name', 'exchange', 'ipoDate']]
+        df = df[['symbol', 'name', 'exchange', 'ipoDate', 'status']]
         df.rename(columns={"ipoDate": "ipo_date"}, inplace=True)
 
         return df

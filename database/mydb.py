@@ -1,5 +1,6 @@
 import pandas as pd
 from sqlalchemy import create_engine
+from sqlalchemy import text
 import configparser as cp
 import logging
 import os
@@ -51,33 +52,132 @@ db = Database()
 # query full stock list from DB
 def query_all_tickers():
     engine = db.get_connection()
-    sql = "select * from tickers;"
+    sql = "select * from tickers where status='Active';"
     df = pd.read_sql_query(sql, engine)
     return df
 
 
 def query_tickers_by_region(region):
     engine = db.get_connection()
-    sql = "select * from tickers where region = '{}';".format(region)
+    sql = "select * from tickers where region = '{}' and status='Active';".format(region)
     df = pd.read_sql_query(sql, engine)
     return df
 
 
-def query_daily_stock_prices(symbol, start_date, end_date):
+def query_daily_stock_prices(symbol, start_date, end_date, mode='realtime'):
+    table_name = 'daily_stock_prices_realtime'
+    if mode == 'history':
+        table_name = 'daily_stock_prices_history'
+
     if start_date is None:
         start_date = '2000-01-01'  # 默认从 2000-01-01 开始获取数据
     engine = db.get_connection()
-    sql = "select * from daily_stock_prices where symbol='{}' and date between '{}' and '{}';".format(symbol, start_date, end_date)
+    sql = ("select * from {} where symbol='{}' and date between '{}' and '{}' ORDER BY symbol, date;"
+           .format(table_name, symbol, start_date, end_date))
     df = pd.read_sql_query(sql, engine)
     return df
 
 
-def query_latest_daily_stock_prices(symbol):
+def query_latest_daily_stock_prices(symbol, mode='realtime'):
+    """
+    查询某只股票的最新日期。
+    """
     engine = db.get_connection()
-    sql = "select date from daily_stock_prices where symbol='{}' order by date desc limit 1;".format(symbol)
-    df = pd.read_sql_query(sql, engine)
-    return df['date'][0]
 
+    table_name = 'daily_stock_prices_realtime'
+    if mode == 'history':
+        table_name = 'daily_stock_prices_history'
+
+    sql = f"""
+    SELECT MAX(date) AS latest_date
+    FROM {table_name}
+    WHERE symbol = '{symbol}';
+    """
+    result = pd.read_sql_query(sql, engine)
+    return result['latest_date'].iloc[0] if not result.empty else None
+
+
+def calculate_moving_averages_batch():
+    """
+    批量计算所有股票的均线。
+    """
+    engine = db.get_connection()
+    sql = """
+       SELECT
+    lp.symbol,
+    lp.date,
+    lp.close as current_price,
+    (SELECT AVG(close)
+     FROM (
+         SELECT close
+         FROM daily_stock_prices_realtime
+         WHERE symbol = lp.symbol AND date <= lp.date
+         ORDER BY date DESC
+         LIMIT 50
+     ) AS last_50_days) AS ma_50,
+    (SELECT AVG(close)
+     FROM (
+         SELECT close
+         FROM daily_stock_prices_realtime
+         WHERE symbol = lp.symbol AND date <= lp.date
+         ORDER BY date DESC
+         LIMIT 150
+     ) AS last_150_days) AS ma_150,
+    (SELECT AVG(close)
+     FROM (
+         SELECT close
+         FROM daily_stock_prices_realtime
+         WHERE symbol = lp.symbol AND date <= lp.date
+         ORDER BY date DESC
+         LIMIT 200
+     ) AS last_200_days) AS ma_200,
+     (SELECT MAX(close)
+     FROM daily_stock_prices_realtime
+     WHERE symbol = lp.symbol) AS high_of_52weeks,
+    (SELECT MIN(close)
+     FROM daily_stock_prices_realtime
+     WHERE symbol = lp.symbol) AS low_of_52weeks
+FROM (
+    SELECT
+        dsp.symbol,
+        dsp.date,
+        dsp.close
+    FROM
+        daily_stock_prices_realtime dsp
+    JOIN tickers AS t ON dsp.symbol = t.symbol
+    WHERE
+        t.status = 'Active'
+        AND dsp.date = (SELECT MAX(date) FROM daily_stock_prices_realtime WHERE symbol = dsp.symbol)
+) AS lp
+ORDER BY
+    lp.symbol;
+        """
+    return pd.read_sql_query(sql, engine)
+
+
+def apply_sql_filter():
+    engine = db.get_connection()
+    sql = """
+    SELECT symbol FROM daily_stock_moving_averages
+    WHERE current_price > ma_50
+    AND ma_50 > ma_150
+    AND ma_150 > ma_200
+    AND current_price >= low_of_52weeks * 1.3 
+    AND current_price >= high_of_52weeks * 0.75;
+    """
+    df = pd.read_sql_query(sql, engine)
+    return df
+
+
+def get_screening_results():
+    engine = db.get_connection()
+    sql = """
+    select dsp.date, dsp.symbol, dsp.close
+    from daily_stock_prices_realtime as dsp
+    join screening_output as so on so.symbol=dsp.symbol;
+    """
+    df = pd.read_sql_query(sql, engine)
+    return df
 
 def write_df_to_table(df, table_name):
     engine = db.get_connection()
@@ -88,3 +188,26 @@ def write_df_to_table(df, table_name):
             logger.info(f"Data written to table {table_name} successfully.")
     except Exception as e:
         logger.error(f"Error writing to table {table_name}: {e}")
+
+
+def update_inactive_tickers():
+    engine = db.get_connection()
+    sql = """
+    UPDATE tickers
+    SET status = 'inactive'
+    WHERE symbol IN (
+        SELECT symbol
+        FROM daily_stock_prices_realtime
+        GROUP BY symbol
+        HAVING 
+            DATEDIFF(CURDATE(), MAX(date)) > 30  -- 最后交易超过30天
+            AND COUNT(*) >= 200  -- 总记录数超过200条
+    );
+    """
+    with engine.connect() as connection:
+        connection.execute(text(sql))
+        connection.commit()
+
+
+if __name__ == '__main__':
+    apply_sql_filter()
