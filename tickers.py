@@ -64,6 +64,30 @@ class Tickers:
             print(f"Finished updating tickers for region: {region}")
         print("All regions updated.")
 
+    @staticmethod
+    def get_exclude_keywords():
+        exclude_keywords = [
+            'ETF',  # 交易所交易基金
+            'Fund',  # 共同基金
+            'Index Fund',  # 指数基金
+            'Trust',  # 信托基金
+            'Mutual',  # 共同基金
+            'Bond',  # 债券基金
+            'AdvisorShares',  # 基金管理公司
+            'Invesco',  # 常见基金发行商
+            'Vanguard',  # 常见基金发行商
+            'Fidelity',  # 常见基金发行商
+            'Portfolio',  # 投资组合
+            'Shares',  # ETF 常用词
+            'Commodity',  # 商品基金
+            'REIT',  # 房地产信托基金
+            'Currency',  # 货币基金
+            'Dividend',  # 红利基金（可能为 ETF）
+            'Growth',  # 成长型基金（可能为 ETF）
+            'Income'  # 收益型基金
+        ]
+        return exclude_keywords
+
 
 if __name__ == '__main__':
     ticker = Tickers()

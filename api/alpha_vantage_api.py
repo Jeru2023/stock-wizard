@@ -133,10 +133,10 @@ class AlphaVantageAPI:
 
 if __name__ == '__main__':
     av_api = AlphaVantageAPI()
-    print(av_api.get_tickers().head())
+    #print(av_api.get_tickers().head())
 
     # EARNINGS, INCOME_STATEMENT
-    # annual_earnings, quarterly_earnings = av_api.get_earnings('MCD')
+    annual_earnings, quarterly_earnings = av_api.get_earnings('AAPL')
     # print(annual_earnings.head())
     # print(quarterly_earnings.head())
 

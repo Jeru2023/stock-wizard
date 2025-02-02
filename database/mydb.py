@@ -17,6 +17,26 @@ from tools import utils
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+exclude_keywords = [
+            'etf',  # 交易所交易基金
+            'fund',  # 共同基金
+            'index',  # 指数基金
+            'trust',  # 信托基金
+            'mutual',  # 共同基金
+            'bond',  # 债券基金
+            'invesco',  # 常见基金发行商
+            'vanguard',  # 常见基金发行商
+            'fidelity',  # 常见基金发行商
+            'portfolio',  # 投资组合
+            'shares',  # ETF 常用词
+            'commodity',  # 商品基金
+            'reit',  # 房地产信托基金
+            'currency',  # 货币基金
+            'dividend',  # 红利基金（可能为 ETF）
+            'growth',  # 成长型基金（可能为 ETF）
+            'income'  # 收益型基金
+        ]
+
 
 class Database:
     def __init__(self):
@@ -169,15 +189,20 @@ def apply_sql_filter():
     return df
 
 
-def get_screening_results():
+def get_screening_results(ma_200_up_trend=False, profit_up_trend=False, cup_with_handle=False):
     engine = db.get_connection()
-    sql = """
-    select dsp.date, dsp.symbol, dsp.close
+    sql = f"""
+    select dsp.date, dsp.symbol, dsp.close, dsp.volume, dsp.open, dsp.high, dsp.low
     from daily_stock_prices_realtime as dsp
-    join screening_output as so on so.symbol=dsp.symbol;
+    join screening_output as so on so.symbol=dsp.symbol
+    WHERE so.ma_200_up_trend={ma_200_up_trend} AND 
+    so.profit_up_trend={profit_up_trend} AND 
+    so.cup_with_handle={cup_with_handle};
     """
+    print(sql)
     df = pd.read_sql_query(sql, engine)
     return df
+
 
 def write_df_to_table(df, table_name):
     engine = db.get_connection()
@@ -190,24 +215,69 @@ def write_df_to_table(df, table_name):
         logger.error(f"Error writing to table {table_name}: {e}")
 
 
-def update_inactive_tickers():
+def update_table(sql):
     engine = db.get_connection()
-    sql = """
-    UPDATE tickers
-    SET status = 'inactive'
-    WHERE symbol IN (
-        SELECT symbol
-        FROM daily_stock_prices_realtime
-        GROUP BY symbol
-        HAVING 
-            DATEDIFF(CURDATE(), MAX(date)) > 30  -- 最后交易超过30天
-            AND COUNT(*) >= 200  -- 总记录数超过200条
-    );
-    """
     with engine.connect() as connection:
         connection.execute(text(sql))
         connection.commit()
 
 
+def update_inactive_tickers():
+
+    sql = f"""
+        UPDATE tickers
+        SET status = 'inactive'
+        WHERE symbol IN (
+            SELECT symbol
+            FROM daily_stock_prices_realtime
+            GROUP BY symbol
+            HAVING 
+                DATEDIFF(CURDATE(), MAX(date)) > 30  -- 最后交易超过30天
+                AND COUNT(*) >= 200  -- 总记录数超过200条
+        )
+    """
+    update_table(sql)
+
+
+def update_exclude_tickers():
+    like_conditions = " OR ".join([f"LOWER(name) LIKE '%{keyword}%'" for keyword in exclude_keywords])
+
+    sql = f"""
+            UPDATE tickers
+            SET status = 'Exclude'
+            WHERE ({like_conditions});
+        """
+    print(sql)
+    update_table(sql)
+
+
+def update_ma_200_up_trend(symbol_list):
+    symbols = ', '.join(f"'{symbol}'" for symbol in symbol_list)
+    sql = f"""
+    UPDATE screening_output set ma_200_up_trend=True WHERE symbol in ({symbols});
+    """
+    update_table(sql)
+
+def update_profit_up_trend(symbol_list):
+    symbols = ', '.join(f"'{symbol}'" for symbol in symbol_list)
+    sql = f"""
+    UPDATE screening_output set profit_up_trend=True WHERE symbol in ({symbols});
+    """
+    update_table(sql)
+
+
+def update_cup_with_handle(symbol_list):
+    symbols = ', '.join(f"'{symbol}'" for symbol in symbol_list)
+    sql = f"""
+    UPDATE screening_output set cup_with_handle=True WHERE symbol in ({symbols});
+    """
+    update_table(sql)
+
+
+def truncate_table(table_name):
+    sql = f"truncate table {table_name}"
+    update_table(sql)
+
+
 if __name__ == '__main__':
-    apply_sql_filter()
+    update_exclude_tickers()
