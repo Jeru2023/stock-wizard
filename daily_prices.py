@@ -14,61 +14,72 @@ class DailyPrices:
         self.tickers = Tickers()
 
     @staticmethod
-    def filter_existing_data(df, symbol, start_date, end_date, mode='realtime'):
+    def filter_existing_data(df, symbol, latest_date, mode='realtime'):
+        start_date = '2000-01-01'
         # 查询数据库中该 symbol 的所有日期
-        existing_dates = mydb.query_daily_stock_prices(symbol, start_date, end_date, mode)['date'].tolist()
-        # 将 df['Date'] 转换为 datetime.date 类型
-        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        existing_dates = mydb.query_daily_stock_prices(symbol, start_date, latest_date, mode)['date'].tolist()
+        df.loc[:, 'date'] = pd.to_datetime(df['date']).dt.date
         # 过滤掉已经存在的日期
-        return df[~df['Date'].isin(existing_dates)]
+        return df[~df['date'].isin(existing_dates)]
 
-    def update_daily_prices_by_symbols(self, symbols, start_date=None, end_date=None, mode='realtime'):
+    def update_daily_prices_by_symbols(self, symbols, start_date=None, end_date=None, mode='update'):
         """
         更新指定多个 symbols 的每日价格数据，避免插入重复数据。
 
         :param symbols: 股票代码列表
         :param start_date: 数据开始日期（可选，默认为 None）
         :param end_date: 数据结束日期（可选，默认为当前日期）
-        :param mode: realtime or history
+        :param mode: update or insert
         """
         table_name = 'daily_stock_prices_realtime'
-        if mode == 'history':
-            table_name = 'daily_stock_prices_history'
 
         # 如果没有提供 end_date，默认为当前日期
         if end_date is None:
             end_date = datetime.now().strftime('%Y-%m-%d')
 
-        # 查询每个 symbol 的最新日期
-        latest_dates = {symbol: mydb.query_latest_daily_stock_prices(symbol, mode) for symbol in symbols}
+        if start_date is None:
+            if mode == 'update':
+                # 设置为一个月以前
+                start_date_delta = 30
+            else:
+                start_date_delta = 365
+            start_date = (datetime.now() - timedelta(days=start_date_delta)).strftime('%Y-%m-%d')
 
         # 从 Yahoo API 获取数据
         df = self.yahoo_api.get_daily_prices_by_symbols(symbols, start_date, end_date)
 
         if not df.empty:
-            df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d')
+            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
 
-            # 创建一个列表来存储每个符号的数据
-            updated_data = []
+            if mode == 'update':
+                # 创建一个列表来存储每个符号的数据
+                updated_data = []
+                # 逐个符号处理数据
+                for symbol in symbols:
+                    latest_date = mydb.query_latest_daily_stock_prices(symbol, mode)
+                    if latest_date:
+                        latest_date = latest_date.strftime('%Y-%m-%d')
+                    else:
+                        latest_date = '2000-01-01' if mode == 'history' else (datetime.now() - timedelta(days=365)).strftime(
+                            '%Y-%m-%d')
 
-            # 逐个符号处理数据
-            for symbol in symbols:
-                latest_date = latest_dates[symbol]
-                if latest_date:
-                    start_date = (latest_date + timedelta(days=1)).strftime('%Y-%m-%d')
+                    # 过滤已经存在的数据
+                    filtered_df = self.filter_existing_data(df[df['symbol'] == symbol], symbol, latest_date, mode)
+
+                    if not filtered_df.empty:
+                        updated_data.append(filtered_df)
+                if len(updated_data) > 0:
+                    final_df = pd.concat(updated_data, ignore_index=True)
                 else:
-                    start_date = '2000-01-01' if mode == 'history' else (datetime.now() - timedelta(days=365)).strftime(
-                        '%Y-%m-%d')
-
-                # 过滤已经存在的数据
-                filtered_df = self.filter_existing_data(df[df['Symbol'] == symbol], symbol, None, end_date, mode)
-
-                if not filtered_df.empty:
-                    updated_data.append(filtered_df)
+                    final_df = pd.DataFrame()
+            else:
+                final_df = df
 
             # 合并所有更新的数据
-            if updated_data:
-                final_df = pd.concat(updated_data, ignore_index=True)
+            if not final_df.empty and len(final_df) > 0:
+                # 移除列索引名称
+                final_df.columns = final_df.columns.rename(None)
+
                 try:
                     mydb.write_df_to_table(final_df, table_name)
                     print(f"Updated {len(final_df)} rows of data for the batch of symbols.")
@@ -83,14 +94,30 @@ class DailyPrices:
         tickers = mydb.query_tickers_by_region('us')
         symbol_list = tickers['symbol'].tolist()  # 获取所有符号
 
+        # # temp
+        # existed_symbol_list = mydb.find_existed_symbols()['symbol'].tolist()
+        # symbol_list = list(set(symbol_list) - set(existed_symbol_list))
+
+
+        print(f"Updating daily prices for {len(symbol_list)} symbols.")
+
         # 分组批处理，每批500个tickers
-        for i in range(0, len(symbol_list), 300):
-            batch_symbols = symbol_list[i:i + 300]
-            self.update_daily_prices_by_symbols(batch_symbols)  # 批量更新
+        for i in range(0, len(symbol_list), 100):
+            print("current index: ", i)
+            batch_symbols = symbol_list[i:i + 100]
+            self.update_daily_prices_by_symbols(batch_symbols, mode='insert')  # 批量更新
             print(f"Finished updating daily prices for batch: {batch_symbols}.")
             time.sleep(0.5)  # 控制请求频率
 
         print("All symbols updated.")
+
+    def update_daily_prices_patch(self):
+        symbols_df = mydb.find_incomplete_symbols()
+        # get symbols as list
+        symbols = symbols_df['symbol'].tolist()
+        mydb.remove_imcomplete_symbols(symbols)
+
+        self.update_daily_prices_by_symbols(symbols, mode='insert')
 
     @staticmethod
     def update_moving_averages():
@@ -325,17 +352,17 @@ class DailyPrices:
 
 if __name__ == '__main__':
     dp = DailyPrices()
-    # dp.update_daily_prices_by_symbol('AAPL')
-    # dp.update_daily_prices()
+    #dp.update_daily_prices()
+    #dp.update_daily_prices_patch()
 
-    # dp.mark_invalid_tickers()
-    #dp.update_moving_averages()
+    #dp.mark_invalid_tickers()
+    # dp.update_moving_averages()
 
-    # dp.save_screening_output()
+    #dp.save_screening_output()
 
-    # dp.apply_ma_200_up_trend_filter()
-    dp.apply_profit_up_trend_filter()
-    #dp.apply_cup_with_handle_symbols_filter()
+    #dp.apply_ma_200_up_trend_filter()
+    #dp.apply_profit_up_trend_filter()
+    dp.apply_cup_with_handle_symbols_filter()
 
 
 

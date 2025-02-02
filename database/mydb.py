@@ -13,9 +13,6 @@ from tools import utils
 # mydb.function_name(params)
 #####################################
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 exclude_keywords = [
             'etf',  # 交易所交易基金
@@ -205,6 +202,9 @@ def get_screening_results(ma_200_up_trend=False, profit_up_trend=False, cup_with
 
 
 def write_df_to_table(df, table_name):
+    # 配置日志
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
     engine = db.get_connection()
     try:
         with engine.connect() as connection:
@@ -215,7 +215,7 @@ def write_df_to_table(df, table_name):
         logger.error(f"Error writing to table {table_name}: {e}")
 
 
-def update_table(sql):
+def execute_sql(sql):
     engine = db.get_connection()
     with engine.connect() as connection:
         connection.execute(text(sql))
@@ -236,7 +236,7 @@ def update_inactive_tickers():
                 AND COUNT(*) >= 200  -- 总记录数超过200条
         )
     """
-    update_table(sql)
+    execute_sql(sql)
 
 
 def update_exclude_tickers():
@@ -248,7 +248,17 @@ def update_exclude_tickers():
             WHERE ({like_conditions});
         """
     print(sql)
-    update_table(sql)
+    execute_sql(sql)
+
+
+def update_ticker_status(status, symbols):
+    symbols = ', '.join(f"'{symbol}'" for symbol in symbols)
+    sql = f"""
+    UPDATE tickers
+    SET status = '{status}'
+    WHERE symbol in ({symbols});
+    """
+    execute_sql(sql)
 
 
 def update_ma_200_up_trend(symbol_list):
@@ -256,14 +266,14 @@ def update_ma_200_up_trend(symbol_list):
     sql = f"""
     UPDATE screening_output set ma_200_up_trend=True WHERE symbol in ({symbols});
     """
-    update_table(sql)
+    execute_sql(sql)
 
 def update_profit_up_trend(symbol_list):
     symbols = ', '.join(f"'{symbol}'" for symbol in symbol_list)
     sql = f"""
     UPDATE screening_output set profit_up_trend=True WHERE symbol in ({symbols});
     """
-    update_table(sql)
+    execute_sql(sql)
 
 
 def update_cup_with_handle(symbol_list):
@@ -271,13 +281,46 @@ def update_cup_with_handle(symbol_list):
     sql = f"""
     UPDATE screening_output set cup_with_handle=True WHERE symbol in ({symbols});
     """
-    update_table(sql)
+    execute_sql(sql)
 
 
 def truncate_table(table_name):
     sql = f"truncate table {table_name}"
-    update_table(sql)
+    execute_sql(sql)
 
+
+def find_incomplete_symbols():
+    engine = db.get_connection()
+    sql = """
+    SELECT DISTINCT symbol
+    FROM (
+    SELECT symbol
+    FROM daily_stock_prices_realtime
+    GROUP BY symbol
+    HAVING COUNT(*) < 254
+    ) AS temp;
+    """
+    return pd.read_sql_query(sql, engine)
+
+
+def remove_imcomplete_symbols(symbol_list):
+    if len(symbol_list) > 0:
+        symbols = ', '.join(f"'{symbol}'" for symbol in symbol_list)
+        sql = f"""
+        DELETE FROM daily_stock_prices_realtime WHERE symbol in ({symbols})
+        """
+        execute_sql(sql)
+    else:
+        print('No incomplete symbols found.')
+
+
+def find_existed_symbols():
+    engine = db.get_connection()
+    sql = """
+    SELECT DISTINCT symbol
+    FROM daily_stock_prices_realtime
+    """
+    return pd.read_sql_query(sql, engine)
 
 if __name__ == '__main__':
-    update_exclude_tickers()
+    print(find_incomplete_symbols())
